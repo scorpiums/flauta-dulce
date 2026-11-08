@@ -34,6 +34,11 @@ input[type=file]{color:var(--mut);max-width:100%}
 .info{color:var(--mut);font-size:.85rem;line-height:1.4}
 .count{font-size:2rem;font-weight:800;color:var(--play);min-width:48px;text-align:center}
 #msg{color:var(--warn);font-size:.85rem;min-height:1.2em;text-align:center}
+#btnPlay{min-width:150px}
+#btnStop{min-width:110px}
+.tempo{display:flex;flex-direction:column;gap:6px;width:100%;margin-top:12px}
+.tempo label{white-space:nowrap}
+.tempo input[type=range]{width:100%}  
 </style>
 </head>
 <body>
@@ -45,9 +50,11 @@ input[type=file]{color:var(--mut);max-width:100%}
   <div class="row">
     <button id="btnPlay">▶ Reproducir</button>
     <button id="btnStop" class="sec">■ Parar</button>
-    <label class="info">Tempo: <b id="bpmVal">80</b> BPM</label>
-    <input type="range" id="bpm" min="40" max="160" value="80">
     <label class="info"><input type="checkbox" id="countIn" checked> Cuenta atrás</label>
+  </div>
+  <div class="tempo">
+    <label class="info" for="bpm">Tempo: <b id="bpmVal">80</b> BPM</label>
+    <input type="range" id="bpm" min="40" max="160" value="80">
   </div>
 </div>
 
@@ -74,7 +81,7 @@ input[type=file]{color:var(--mut);max-width:100%}
 
 <div class="panel info">
   <b>Estado de la plantilla:</b> <span id="estadoTabla"></span>
-  <br>Las digitaciones marcadas como pendientes no están verificadas contra tu plantilla. Completa la tabla <code>TABLA_PLANTILLA</code> antes de usarla con alumnos.
+  <br>Digitaciones transcritas de la plantilla y comprobadas con la flauta.
 </div>
 
 <script>
@@ -97,7 +104,38 @@ const MIDI_BASE = 72;
 // ============================================================
 const TABLA_PLANTILLA = {};
 ORDEN.forEach(n => TABLA_PLANTILLA[n] = { holes: [0,0,0,0,0,0,0,0], verificada: false });
-TABLA_PLANTILLA["Do"] = { holes: [1,1,1,1,1,1,1,1], verificada: true }; // confirmar con la flauta
+const DIGITACIONES_PLANTILLA = {
+  "Do#":            [1,1,1,1,1,1,0.5,1],
+  "Re":             [1,1,1,1,1,1,0,1],
+  "Re#":            [1,1,1,1,1,0.5,0,1],
+  "Mi":             [1,1,1,1,1,0,0,1],
+  "Fa":             [1,1,1,1,0,0,0,1],
+  "Fa#":            [1,1,1,0,1,1,1,1],
+  "Sol":            [1,1,1,0,0,0,0,1],
+  "Sol#":           [1,1,0,1,1,0,0,1],
+  "La":             [1,1,0,0,0,0,0,1],
+  "La#":            [1,0,1,0,0,0,0,1],
+  "Si":             [1,0,0,0,0,0,0,1],
+  "Do agudo":       [0,1,0,0,0,0,0,1],
+  "Do# agudo":      [1,1,0,0,0,0,0,0],
+  "Re agudo":       [0,1,0,0,0,0,0,0],
+  "Re# agudo":      [1,1,1,1,1,0.5,0,0.5],
+  "Mi agudo":       [1,1,1,1,1,0,0,0.5],
+  "Fa agudo":       [1,1,1,1,0,0,0,0.5],
+  "Fa# agudo":      [1,1,1,0,1,0,0,0.5],
+  "Sol agudo":      [1,1,1,0,0,0,0,0.5],
+  "Sol# agudo":     [1,1,0,1,0,0,0,0.5],
+  "La agudo":       [1,1,0,0,0,0,0,0.5],
+  "La# agudo":      [1,1,0,1,1,1,0,0.5],
+  "Si agudo":       [1,1,0,1,1,0,0,0.5],
+  "Do sobre agudo": [1,0,0,1,0,0,0,0.5]
+};
+
+// Cargar en la tabla. Todas verificadas tras comprobarlas con la flauta.
+Object.entries(DIGITACIONES_PLANTILLA).forEach(([nombre, holes]) => {
+  TABLA_PLANTILLA[nombre] = { holes, verificada: true };
+});
+TABLA_PLANTILLA["Do"] = { holes: [1,1,1,1,1,1,1,1], verificada: true };
 
 // ============================================================
 // 3. SVG DE LA FLAUTA
