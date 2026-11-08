@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Flauta Dulce · Pentagrama y Digitación</title>
 <style>
-:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#f8fafc;--mut:#94a3b8;--acc:#38bdf8;--play:#ef4444;--ok:#22c55e;--warn:#f59e0b}
+:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#f8fafc;--mut:#94a3b8;--acc:#38bdf8;--play:#ef4444;--warn:#f59e0b}
 *{box-sizing:border-box}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);margin:0;padding:16px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
 h1{margin:4px 0;color:var(--acc);font-size:1.5rem;text-align:center}
@@ -15,29 +15,41 @@ h1{margin:4px 0;color:var(--acc);font-size:1.5rem;text-align:center}
 button{background:var(--acc);color:#0f172a;font-weight:700;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:.95rem}
 button:disabled{opacity:.4;cursor:not-allowed}
 button.sec{background:#334155;color:var(--txt)}
-input[type=range]{accent-color:var(--acc);flex:1;min-width:160px}
 input[type=file]{color:var(--mut);max-width:100%}
 .info{color:var(--mut);font-size:.85rem;line-height:1.4}
 #btnPlay{min-width:150px}
 #btnStop{min-width:110px}
 .tempo{display:flex;flex-direction:column;gap:6px;width:100%;margin-top:12px}
 .tempo label{white-space:nowrap}
-.tempo input[type=range]{width:100%}
+.tempo input[type=range]{width:100%;accent-color:var(--acc)}
 
-.stage{position:relative;width:100%;max-width:900px;height:260px;background:#020617;border:2px solid var(--line);border-radius:16px;overflow:hidden}
-.track{position:absolute;top:0;left:0;height:260px;will-change:transform}
-.playhead{position:absolute;top:0;bottom:0;left:30%;width:3px;background:var(--play);box-shadow:0 0 10px var(--play);z-index:5}
-.clef{position:absolute;left:6px;top:192px;transform:translateY(-50%);font-size:78px;line-height:1;color:var(--txt);z-index:4;background:#020617;padding-right:6px}
-.mw{position:absolute;top:8px;width:28px;transition:transform .15s}
-.mw svg.mini{width:28px;height:59px;display:block}
-.mw.active{transform:scale(1.25);transform-origin:bottom center}
-.mw.active svg{filter:drop-shadow(0 0 5px var(--acc))}
-.mw.pend{opacity:.4}
+/* Escenario */
+.stage{position:relative;width:100%;max-width:900px;height:200px;background:#020617;border:2px solid var(--line);border-radius:16px;overflow:hidden}
+.partitura{position:absolute;left:0;top:4px;overflow:visible}
+.clave{position:absolute;left:0;top:4px;z-index:4}
+.playhead{position:absolute;top:6px;bottom:6px;left:30%;width:2px;background:var(--play);box-shadow:0 0 8px var(--play);z-index:5}
+.cuenta{position:absolute;top:6px;left:calc(30% + 10px);font-size:1.6rem;font-weight:800;color:var(--play);z-index:6;pointer-events:none}
 
-.big{display:flex;gap:20px;align-items:center;justify-content:center;flex-wrap:wrap}
-.big .flute{width:110px;height:230px}
-.count{font-size:2rem;font-weight:800;color:var(--play);min-width:48px;text-align:center}
-#msg{color:var(--warn);font-size:.85rem;min-height:1.2em;text-align:center}
+/* Elementos SVG */
+.linea{stroke:#94a3b8;stroke-width:1.2}
+.comp{fill:#f8fafc;font:700 16px serif}
+.nota .plica{stroke:#f8fafc;stroke-width:1.4}
+.bandera{fill:none;stroke:#f8fafc;stroke-width:1.6}
+.cabeza{stroke:#f8fafc;stroke-width:1.6}
+.cabeza.solida{fill:#f8fafc}
+.cabeza.hueca{fill:none}
+.alt{fill:#f8fafc;font-size:15px}
+.pt{fill:#f8fafc}
+.nombre{fill:#94a3b8;font-size:11px;text-anchor:middle}
+.nota .mini{opacity:.6}
+.nota.act .mini{opacity:1}
+.nota.act .cabeza,.nota.act .plica{stroke:var(--acc)}
+.nota.act .solida{fill:var(--acc)}
+.nota.act .nombre{fill:var(--acc);font-weight:700}
+.nota.pend .mini{opacity:.35}
+.nota.pend .nombre{fill:var(--warn)}
+
+#msg{color:var(--warn);font-size:.85rem;min-height:1.2em;text-align:center;margin-top:6px}
 </style>
 </head>
 <body>
@@ -58,9 +70,13 @@ input[type=file]{color:var(--mut);max-width:100%}
 </div>
 
 <div class="stage" id="stage">
-  <div class="playhead"></div>
-  <div class="clef">𝄞</div>
-  <div id="track" class="track"></div>
+  <svg id="partitura" class="partitura" height="190"></svg>
+  <svg class="clave" width="70" height="190" viewBox="0 0 70 190">
+    <rect width="70" height="190" fill="#020617"/>
+    <text x="8" y="147" font-size="64" fill="#f8fafc">𝄞</text>
+  </svg>
+  <div class="playhead" id="playhead"></div>
+  <div class="cuenta" id="contador"></div>
 </div>
 <div id="msg"></div>
 
@@ -74,14 +90,6 @@ input[type=file]{color:var(--mut);max-width:100%}
   <p class="info" id="infoPartitura"></p>
 </div>
 
-<div class="panel">
-  <div class="big">
-    <div class="count" id="contador"></div>
-    <div id="actual"></div>
-  </div>
-  <p class="info" id="infoNota" style="text-align:center"></p>
-</div>
-
 <div class="panel info">
   <b>Estado de la plantilla:</b> <span id="estadoTabla"></span>
   <br>Digitaciones transcritas de la plantilla y comprobadas con la flauta.
@@ -89,7 +97,7 @@ input[type=file]{color:var(--mut);max-width:100%}
 
 <script>
 // ============================================================
-// 1. NOMBRES Y RANGO (Do grave de la plantilla = C4 = MIDI 60)
+// 1. NOMBRES, RANGO Y NOTACIÓN
 // ============================================================
 const NOMBRES = ["Do","Do#","Re","Re#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Si"];
 const ORDEN = [];
@@ -97,7 +105,19 @@ for (let i = 0; i < 25; i++) {
   const base = NOMBRES[i % 12];
   ORDEN.push(i === 24 ? "Do sobre agudo" : (i < 12 ? base : base + " agudo"));
 }
-const MIDI_BASE = 60;
+const MIDI_BASE = 60;                     // Do grave de la plantilla = C4
+const LETRA_IDX = { C:0, D:1, E:2, F:3, G:4, A:5, B:6 };
+const PASOS_MIDI = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+// Para cada clase de altura: [letra, sostenido]. Se usa solo cuando no hay ortografía original.
+const PC_SOSTENIDO = [[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
+const LETRAS_ES = ["Do","Re","Mi","Fa","Sol","La","Si"];
+
+// Posición diatónica: C4 = 28, E4 (línea inferior) = 30, F5 (línea superior) = 38
+function infoMidi(midi) {
+  const [letra, sost] = PC_SOSTENIDO[((midi % 12) + 12) % 12];
+  const oct = Math.floor(midi / 12) - 1;
+  return { dIdx: oct * 7 + letra, acc: sost ? 1 : 0 };
+}
 
 // Convierte nombres escritos (Reb, Mi#, Fa# agudo, Do sobre agudo...) a la nota de ORDEN
 const LETRA = { Do: 0, Re: 2, Mi: 4, Fa: 5, Sol: 7, La: 9, Si: 11 };
@@ -156,80 +176,63 @@ Object.entries(DIGITACIONES_PLANTILLA).forEach(([nombre, holes]) => {
 TABLA_PLANTILLA["Do"] = { holes: [1,1,1,1,1,1,1,1], verificada: true };
 
 // ============================================================
-// 3. SVG DE LA FLAUTA (cls: "flute" grande o "mini" para el pentagrama)
+// 3. FIGURAS Y EVENTOS
 // ============================================================
-let svgUid = 0;
-function svgFlauta(holes, cls = "flute") {
-  const uid = "f" + (++svgUid);
-  const ys = [30, 50, 70, 90, 110, 130, 150];
-  const cx = 45, r = 8;
-  let s = `<rect x="36" y="8" width="18" height="170" rx="9" fill="#1e293b" stroke="#64748b" stroke-width="2"/>`;
+const BASES_FIGURA = [[4,"redonda"],[2,"blanca"],[1,"negra"],[0.5,"corchea"],[0.25,"semicorchea"]];
 
-  const agujero = (x, y, st, key) => {
-    const id = `${uid}-${key}`;
-    if (st === 0.5) {
-      return `<clipPath id="${id}"><rect x="${x - r}" y="${y}" width="${2 * r}" height="${r}"/></clipPath>
-        <circle cx="${x}" cy="${y}" r="${r}" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
-        <circle cx="${x}" cy="${y}" r="${r}" fill="#f1f5f9" clip-path="url(#${id})"/>`;
-    }
-    const fill = st === 1 ? "#f1f5f9" : "#0f172a";
-    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="#64748b" stroke-width="1.5"/>`;
-  };
-
-  for (let k = 0; k < 7; k++) s += agujero(cx, ys[k], holes[k], "d" + k);
-  s += agujero(62, ys[1], holes[7], "pulgar");
-  return `<svg class="${cls}" viewBox="0 0 90 190">${s}</svg>`;
+function figuraDe(dur) {
+  for (const [b, tipo] of BASES_FIGURA) {
+    if (Math.abs(dur - b) < 1e-3) return { tipo, puntos: 0 };
+    if (Math.abs(dur - b * 1.5) < 1e-3) return { tipo, puntos: 1 };
+    if (Math.abs(dur - b * 1.75) < 1e-3) return { tipo, puntos: 2 };
+  }
+  // Duración no estándar: se aproxima a la figura más cercana
+  let mejor = BASES_FIGURA[0];
+  for (const bf of BASES_FIGURA) if (Math.abs(bf[0] - dur) < Math.abs(mejor[0] - dur)) mejor = bf;
+  return { tipo: mejor[1], puntos: 0 };
 }
 
-// ============================================================
-// 4. GEOMETRÍA DEL PENTAGRAMA
-// ============================================================
-const PPB = 60;     // píxeles por tiempo
-const X0 = 120;     // posición de inicio de la partitura dentro de la pista
-const Y0 = 200;     // línea inferior del pentagrama (E4)
-const GAP = 8;      // separación entre líneas
-const OFF = 2000;   // margen izquierdo de la pista para que el pentagrama no acabe antes de tiempo
-
-// Índice diatónico: C4 = 28, E4 = 30 (línea inferior), F5 = 38 (línea superior)
-const PC = [[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
-function posStaff(midi) {
-  const [L, s] = PC[midi % 12];
-  const oct = Math.floor(midi / 12) - 1;
-  return { idx: L + 7 * oct, sharp: s === 1 };
-}
-const yDeIdx = k => Y0 - (k - 30) * GAP / 2;
-
-// ============================================================
-// 5. MODELO DE EVENTOS
-// ============================================================
 let eventos = [];
+let compases = [];
 let totalBeats = 0;
 let bpm = 80;
 
 function freqDeMidi(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
-function crearEvento(nombre, start, dur) {
-  if (nombre === null) return { rest: true, nombre: "Silencio", start, dur };
-  const i = ORDEN.indexOf(nombre);
-  return { rest: false, nombre, midi: i >= 0 ? MIDI_BASE + i : null, freq: i >= 0 ? freqDeMidi(MIDI_BASE + i) : null, start, dur };
-}
-
-function crearEventoMidi(midi, start, dur) {
+function crearEventoMidi(midi, start, dur, extra = {}) {
   const i = midi - MIDI_BASE;
   const fuera = i < 0 || i > 24;
+  const base = infoMidi(midi);
   return {
     rest: false,
     nombre: fuera ? `fuera de rango (MIDI ${midi})` : ORDEN[i],
-    midi, freq: freqDeMidi(midi), start, dur, fuera
+    midi, freq: freqDeMidi(midi), start, dur, fuera,
+    dIdx: extra.dIdx ?? base.dIdx,
+    acc: extra.acc ?? base.acc,
+    fig: figuraDe(dur)
   };
 }
 
-function setEventos(lista) {
+function crearEvento(nombre, start, dur) {
+  if (nombre === null) return { rest: true, nombre: "Silencio", start, dur, fig: figuraDe(dur) };
+  const i = ORDEN.indexOf(nombre);
+  if (i < 0) return { rest: false, nombre, midi: null, freq: null, start, dur, fuera: true, dIdx: 34, acc: 0, fig: figuraDe(dur) };
+  return crearEventoMidi(MIDI_BASE + i, start, dur);
+}
+
+function setEventos(lista, comp) {
   eventos = lista;
   totalBeats = lista.length ? Math.max(...lista.map(e => e.start + e.dur)) : 0;
-  renderTrack();
+  compases = comp && comp.length ? comp : compasPorDefecto(totalBeats);
+  dibujarPartitura();
   actualizarInfo();
   pintar(0);
+}
+
+function compasPorDefecto(total) {
+  const arr = [];
+  for (let b = 0; b <= total; b += 4) arr.push({ beat: b, num: 4, den: 4, cambio: b === 0 });
+  return arr;
 }
 
 function melodiaEjemplo() {
@@ -239,7 +242,7 @@ function melodiaEjemplo() {
 }
 
 // ============================================================
-// 6. LECTOR MUSICXML
+// 4. LECTOR MUSICXML (notas, silencios, compases y ortografía original)
 // ============================================================
 function parseMusicXML(texto) {
   const doc = new DOMParser().parseFromString(texto, "application/xml");
@@ -250,14 +253,25 @@ function parseMusicXML(texto) {
   const tempoEl = doc.querySelector("sound[tempo]");
   const tempo = tempoEl ? Math.round(parseFloat(tempoEl.getAttribute("tempo"))) : null;
 
-  const PASOS = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   const numTag = (el, tag) => { const t = el.querySelector(tag); return t ? parseFloat(t.textContent) : 0; };
 
   let div = 1, cursor = 0;
-  const lista = [];
+  let compasActual = { num: 4, den: 4 };
+  const lista = [], compases = [];
 
   for (const m of part.children) {
     if (m.tagName !== "measure") continue;
+
+    const attrs = Array.from(m.children).find(c => c.tagName === "attributes");
+    const tiempo = attrs && attrs.querySelector("time");
+    if (tiempo) {
+      compasActual = {
+        num: parseInt(tiempo.querySelector("beats").textContent, 10),
+        den: parseInt(tiempo.querySelector("beat-type").textContent, 10)
+      };
+    }
+    compases.push({ beat: cursor, ...compasActual, cambio: !!tiempo });
+
     for (const el of m.children) {
       if (el.tagName === "attributes") {
         const d = el.querySelector("divisions");
@@ -277,28 +291,30 @@ function parseMusicXML(texto) {
           const step = p.querySelector("step").textContent;
           const alter = Math.round(numTag(p, "alter"));
           const oct = parseInt(p.querySelector("octave").textContent, 10);
-          const midi = (oct + 1) * 12 + PASOS[step] + alter;
+          const midi = (oct + 1) * 12 + PASOS_MIDI[step] + alter;
+          const extra = { dIdx: oct * 7 + LETRA_IDX[step], acc: alter };
 
           const ultimo = lista[lista.length - 1];
           const ligadura = el.querySelector('tie[type="stop"]');
           if (ligadura && ultimo && !ultimo.rest && ultimo.midi === midi &&
               Math.abs(ultimo.start + ultimo.dur - cursor) < 1e-6) {
             ultimo.dur += dur;
+            ultimo.fig = figuraDe(ultimo.dur);
           } else {
-            lista.push(crearEventoMidi(midi, cursor, dur));
+            lista.push(crearEventoMidi(midi, cursor, dur, extra));
           }
         }
         cursor += dur;
       }
     }
   }
-  return { eventos: lista, tempo };
+  return { eventos: lista, tempo, compases };
 }
 
 // ============================================================
-// 7. AUDIO: TODO SE PROGRAMA EN EL RELOJ DE AUDIO
+// 5. AUDIO: TODO SE PROGRAMA EN EL RELOJ DE AUDIO
 // ============================================================
-let ac = null, reproduciendo = false, offset = 0, beatZero = 0, nodos = [], rafId = 0, lastIdx = -2;
+let ac = null, reproduciendo = false, offset = 0, beatZero = 0, nodos = [], rafId = 0;
 const spb = () => 60 / bpm;
 
 function getAC() {
@@ -396,90 +412,199 @@ function bucle() {
 }
 
 // ============================================================
-// 8. RENDER DEL PENTAGRAMA Y DE LAS DIGITACIONES
+// 6. GEOMETRÍA DEL PENTAGRAMA
 // ============================================================
-function renderTrack() {
-  const track = document.getElementById("track");
-  const total = X0 + totalBeats * PPB + 400;
-  const W = OFF + total;
-  const xBeat = b => X0 + b * PPB;
+const PPB = 70;           // píxeles por tiempo (negra)
+const X0 = 100;           // inicio de la primera barra dentro de la partitura
+const STAFF_TOP = 104;    // línea superior del pentagrama
+const GAP = 9;            // separación entre líneas
+const STAFF_BOT = STAFF_TOP + 4 * GAP;
+const NAME_Y = STAFF_BOT + 34;
+const PLICA = 30, HALF_W = 5.5;
 
-  let g = "";
-  // Cinco líneas del pentagrama
-  for (let k = 0; k < 5; k++) {
-    g += `<line x1="${-OFF}" y1="${Y0 - GAP * k}" x2="${total}" y2="${Y0 - GAP * k}" stroke="#475569" stroke-width="1.2"/>`;
-  }
-  // Líneas de compás cada 4 tiempos
-  for (let b = 0; b <= totalBeats; b += 4) {
-    g += `<line x1="${xBeat(b)}" y1="${Y0 - GAP * 4}" x2="${xBeat(b)}" y2="${Y0}" stroke="#334155" stroke-width="1"/>`;
-  }
+const yDeIdx = k => STAFF_BOT - (k - 30) * GAP / 2;
+const xNota = e => X0 + e.start * PPB + 14;
 
-  let mw = "";
-  eventos.forEach((e, i) => {
-    const cx = xBeat(e.start + e.dur / 2);
+let NOTAS_DOM = [];
+let activoAnt = -1;
 
-    if (e.rest) {
-      g += `<rect x="${cx - 6}" y="${Y0 - GAP * 3}" width="12" height="4" fill="#94a3b8"/>`;
-      return;
+// Figura de la digitación: la de la plantilla en miniatura
+let uidFlauta = 0;
+function fluteInner(holes) {
+  const uid = "f" + (++uidFlauta);
+  const ys = [30, 50, 70, 90, 110, 130, 150];
+  const cx = 45, r = 8;
+  const agujero = (x, y, st, clave) => {
+    if (st === 0.5) {
+      const id = `${uid}-${clave}`;
+      return `<clipPath id="${id}"><rect x="${x - r}" y="${y}" width="${2 * r}" height="${r}"/></clipPath>
+        <circle cx="${x}" cy="${y}" r="${r}" fill="#0f172a" stroke="#64748b" stroke-width="2"/>
+        <circle cx="${x}" cy="${y}" r="${r}" fill="#f1f5f9" clip-path="url(#${id})"/>`;
     }
-    if (e.midi == null) return;
+    const fill = st === 1 ? "#f1f5f9" : "#0f172a";
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="#64748b" stroke-width="2"/>`;
+  };
+  let s = `<rect x="36" y="8" width="18" height="170" rx="9" fill="#1e293b" stroke="#64748b" stroke-width="2"/>`;
+  for (let k = 0; k < 7; k++) s += agujero(cx, ys[k], holes[k], "d" + k);
+  s += agujero(62, ys[1], holes[7], "p");
+  return s;
+}
 
-    const { idx, sharp } = posStaff(e.midi);
-    const cy = yDeIdx(idx);
-    const ledger = y => `<line x1="${cx - 11}" x2="${cx + 11}" y1="${y}" y2="${y}" stroke="#94a3b8" stroke-width="1.2"/>`;
+const ledger = (cx, y) => `<line class="linea" x1="${cx - 11}" x2="${cx + 11}" y1="${y}" y2="${y}"/>`;
+const simboloAlt = a => ({ 1: "♯", 2: "×", [-1]: "♭", [-2]: "♭♭" })[a] || "";
 
-    // Líneas adicionales por debajo y por encima del pentagrama
-    if (idx < 30) for (let k = 28; k >= idx; k -= 2) g += ledger(yDeIdx(k));
-    if (idx > 38) for (let k = 40; k <= idx; k += 2) g += ledger(yDeIdx(k));
+function etiqueta(e) {
+  if (e.rest) return "";
+  if (e.fuera) return "?";
+  const letra = LETRAS_ES[((e.dIdx % 7) + 7) % 7];
+  const oct = Math.floor(e.dIdx / 7);
+  const marca = oct >= 6 ? "″" : oct === 5 ? "′" : oct <= 3 ? "," : "";
+  return letra + simboloAlt(e.acc) + marca;
+}
 
-    if (sharp) g += `<text x="${cx - 17}" y="${cy + 5}" font-size="15" fill="#f8fafc">♯</text>`;
+function silencioSVG(e, cx) {
+  const tipo = e.fig.tipo;
+  if (tipo === "redonda") return `<rect x="${cx - 7}" y="${STAFF_TOP + GAP}" width="14" height="4" fill="#94a3b8"/>`;
+  if (tipo === "blanca") return `<rect x="${cx - 7}" y="${STAFF_TOP + 2 * GAP - 4}" width="14" height="4" fill="#94a3b8"/>`;
+  const m = STAFF_TOP + 2 * GAP;
+  return `<path d="M${cx - 3} ${m - 9} l6 6 l-6 6 l5 6 l-6 5" fill="none" stroke="#94a3b8" stroke-width="2"/>`;
+}
 
-    const hueca = e.dur >= 2;
-    g += `<ellipse cx="${cx}" cy="${cy}" rx="6" ry="4.5" fill="${hueca ? "none" : "#f8fafc"}" stroke="#f8fafc" stroke-width="1.6" transform="rotate(-20 ${cx} ${cy})"/>`;
+function banderas(x, y, arriba, doble) {
+  const d = arriba ? 1 : -1;
+  let s = `<path class="bandera" d="M${x} ${y} c 9 ${4 * d} 10 ${12 * d} 2 ${22 * d}"/>`;
+  if (doble) s += `<path class="bandera" d="M${x} ${y + 6 * d} c 9 ${4 * d} 10 ${12 * d} 2 ${22 * d}"/>`;
+  return s;
+}
 
-    const corto = e.fuera ? "?" : e.nombre.replace(" sobre agudo", "′′").replace(" agudo", "′");
-    g += `<text x="${cx}" y="${Y0 + 30}" text-anchor="middle" font-size="12" fill="#94a3b8">${corto}</text>`;
+// ============================================================
+// 7. RENDER DE LA PARTITURA
+// ============================================================
+function dibujarPartitura() {
+  const svg = document.getElementById("partitura");
+  const finX = X0 + totalBeats * PPB + 200;
+  svg.setAttribute("width", finX);
+  const xB = b => X0 + b * PPB;
+
+  // Pentagrama, compases y barras
+  let fondo = "";
+  for (let k = 0; k < 5; k++) {
+    const y = STAFF_TOP + k * GAP;
+    fondo += `<line x1="-1200" y1="${y}" x2="${finX}" y2="${y}" stroke="#475569" stroke-width="1.2"/>`;
+  }
+  compases.forEach(c => {
+    const x = xB(c.beat);
+    fondo += `<line x1="${x}" y1="${STAFF_TOP}" x2="${x}" y2="${STAFF_BOT}" stroke="#94a3b8" stroke-width="1.4"/>`;
+    if (c.cambio) {
+      const xc = c.beat === 0 ? x - 24 : x + 6;
+      fondo += `<text class="comp" x="${xc}" y="${STAFF_TOP + 2 * GAP - 1}">${c.num}</text>`;
+      fondo += `<text class="comp" x="${xc}" y="${STAFF_TOP + 4 * GAP - 1}">${c.den}</text>`;
+    }
+  });
+  const xFin = xB(totalBeats);
+  fondo += `<line x1="${xFin}" y1="${STAFF_TOP}" x2="${xFin}" y2="${STAFF_BOT}" stroke="#94a3b8" stroke-width="3"/>`;
+
+  // Grupos de corcheas unidas por viga (dentro del mismo tiempo)
+  const grupoDe = new Array(eventos.length).fill(null);
+  const grupos = [];
+  let actual = null;
+  eventos.forEach((e, i) => {
+    const esCorchea = !e.rest && e.fig.tipo === "corchea";
+    if (esCorchea && actual && Math.floor(e.start) === Math.floor(actual.ult.start)) {
+      actual.idx.push(i);
+      actual.ult = e;
+    } else if (esCorchea) {
+      actual = { idx: [i], ult: e };
+      grupos.push(actual);
+    } else {
+      actual = null;
+    }
+    if (esCorchea) grupoDe[i] = actual;
+  });
+
+  let vigas = "";
+  grupos.forEach(g => {
+    if (g.idx.length < 2) return;
+    const media = g.idx.reduce((s, j) => s + eventos[j].dIdx, 0) / g.idx.length;
+    g.arriba = media < 34;
+    const ys = g.idx.map(j => {
+      const cy = yDeIdx(eventos[j].dIdx);
+      return g.arriba ? cy - PLICA : cy + PLICA;
+    });
+    g.yViga = g.arriba ? Math.min(...ys) : Math.max(...ys);
+    const x1 = xNota(eventos[g.idx[0]]) + (g.arriba ? HALF_W : -HALF_W);
+    const x2 = xNota(eventos[g.idx[g.idx.length - 1]]) + (g.arriba ? HALF_W : -HALF_W);
+    vigas += `<rect x="${Math.min(x1, x2)}" y="${g.arriba ? g.yViga : g.yViga - 4}" width="${Math.abs(x2 - x1)}" height="4" fill="#f8fafc"/>`;
+  });
+
+  // Notas, silencios y digitaciones en miniatura
+  const notasSVG = eventos.map((e, i) => {
+    const cx = xNota(e);
+    if (e.rest) return `<g class="nota" data-i="${i}">${silencioSVG(e, cx)}</g>`;
+
+    const cy = yDeIdx(e.dIdx);
+    const g = grupoDe[i];
+    const agrupada = g && g.idx.length >= 2;
+    const arriba = agrupada ? g.arriba : e.dIdx < 34;
+    const finY = agrupada ? g.yViga : (arriba ? cy - PLICA : cy + PLICA);
+    const sx = cx + (arriba ? HALF_W : -HALF_W);
+    const hueca = e.fig.tipo === "redonda" || e.fig.tipo === "blanca";
+    const pend = !TABLA_PLANTILLA[e.nombre] || !TABLA_PLANTILLA[e.nombre].verificada;
+
+    let s = "";
+    if (e.dIdx < 30) for (let k = 28; k >= e.dIdx; k -= 2) s += ledger(cx, yDeIdx(k));
+    if (e.dIdx > 38) for (let k = 40; k <= e.dIdx; k += 2) s += ledger(cx, yDeIdx(k));
+    if (e.acc) s += `<text class="alt" x="${cx - 16}" y="${cy + 5}">${simboloAlt(e.acc)}</text>`;
+    if (e.fig.tipo !== "redonda") s += `<line class="plica" x1="${sx}" x2="${sx}" y1="${cy}" y2="${finY}"/>`;
+    if (!agrupada && (e.fig.tipo === "corchea" || e.fig.tipo === "semicorchea")) {
+      s += banderas(sx, finY, arriba, e.fig.tipo === "semicorchea");
+    }
+    s += `<ellipse class="cabeza ${hueca ? "hueca" : "solida"}" cx="${cx}" cy="${cy}" rx="6" ry="4.5" transform="rotate(-20 ${cx} ${cy})"/>`;
+    for (let p = 0; p < e.fig.puntos; p++) {
+      const py = e.dIdx % 2 === 0 ? cy - GAP / 2 : cy;
+      s += `<circle class="pt" cx="${cx + 10 + p * 4}" cy="${py}" r="1.8"/>`;
+    }
 
     const t = TABLA_PLANTILLA[e.nombre];
     const holes = t ? t.holes : [0,0,0,0,0,0,0,0];
-    mw += `<div class="mw${!t || !t.verificada ? " pend" : ""}" data-i="${i}" style="left:${cx - 14}px">${svgFlauta(holes, "mini")}</div>`;
-  });
+    s += `<svg class="mini" x="${cx - 9}" y="2" width="18" height="76" viewBox="30 4 42 178">${fluteInner(holes)}</svg>`;
+    s += `<text class="nombre" x="${cx}" y="${NAME_Y}">${etiqueta(e)}</text>`;
 
-  track.innerHTML =
-    `<svg style="position:absolute;left:${-OFF}px;top:0" width="${W}" height="260" viewBox="${-OFF} 0 ${W} 260">${g}</svg>` + mw;
+    return `<g class="nota${pend ? " pend" : ""}" data-i="${i}">${s}</g>`;
+  }).join("");
+
+  svg.innerHTML = `<g id="grupo">${fondo}${notasSVG}${vigas}</g>`;
+  NOTAS_DOM = Array.from(svg.querySelectorAll("g.nota"));
+  activoAnt = -1;
 }
 
+// ============================================================
+// 8. POSICIÓN, RESALTADO Y CUENTA ATRÁS
+// ============================================================
 function pintar(b) {
   const beat = Math.min(Math.max(b, 0), totalBeats);
-  const i = eventos.findIndex(e => beat >= e.start && beat < e.start + e.dur);
-
   const px = document.getElementById("stage").clientWidth * 0.3;
-  document.getElementById("track").style.transform = `translateX(${px - (X0 + beat * PPB)}px)`;
+  const grupo = document.getElementById("grupo");
+  if (grupo) grupo.setAttribute("transform", `translate(${px - (X0 + 14 + beat * PPB)},0)`);
 
-  document.querySelectorAll(".mw").forEach(m => m.classList.toggle("active", Number(m.dataset.i) === i));
+  const i = eventos.findIndex(e => beat >= e.start && beat < e.start + e.dur);
+  if (i !== activoAnt) {
+    if (activoAnt >= 0 && NOTAS_DOM[activoAnt]) NOTAS_DOM[activoAnt].classList.remove("act");
+    if (i >= 0 && NOTAS_DOM[i]) NOTAS_DOM[i].classList.add("act");
+    activoAnt = i;
+  }
 
-  const contador = document.getElementById("contador");
-  contador.textContent = (reproduciendo && b < 0) ? Math.ceil(-b) : "";
-
-  if (i !== lastIdx) { lastIdx = i; renderActual(i); }
+  document.getElementById("contador").textContent = (reproduciendo && b < 0) ? Math.ceil(-b) : "";
 }
 
-function renderActual(i) {
-  const act = document.getElementById("actual");
-  const info = document.getElementById("infoNota");
-  const e = eventos[i];
-  if (!e) { act.innerHTML = ""; info.textContent = ""; return; }
-  if (e.rest) { act.innerHTML = '<div class="info">Silencio</div>'; info.textContent = ""; return; }
-  const t = TABLA_PLANTILLA[e.nombre];
-  act.innerHTML = svgFlauta(t ? t.holes : [0,0,0,0,0,0,0,0]);
-  info.textContent = e.nombre + (t && !t.verificada ? " · digitación pendiente de verificar" : "");
-}
-
+// ============================================================
+// 9. INFORMACIÓN Y MENSAJES
+// ============================================================
 function actualizarInfo() {
   const pend = eventos.filter(e => !e.rest && (!TABLA_PLANTILLA[e.nombre] || !TABLA_PLANTILLA[e.nombre].verificada)).length;
   const fuera = eventos.filter(e => e.fuera).length;
   document.getElementById("infoPartitura").textContent =
-    `${eventos.length} eventos · ${totalBeats} tiempos · ${bpm} BPM` +
+    `${eventos.length} eventos · ${compases.length} compases · ${totalBeats} tiempos · ${bpm} BPM` +
     (pend ? ` · ${pend} notas con digitación pendiente` : "") +
     (fuera ? ` · ${fuera} notas fuera de rango` : "");
 
@@ -490,7 +615,7 @@ function actualizarInfo() {
 function mensaje(t) { document.getElementById("msg").textContent = t; }
 
 // ============================================================
-// 9. CONTROLES
+// 10. CONTROLES
 // ============================================================
 document.getElementById("btnPlay").addEventListener("click", () => reproduciendo ? pausar() : play());
 document.getElementById("btnStop").addEventListener("click", parar);
@@ -521,7 +646,7 @@ document.getElementById("fileXml").addEventListener("change", async ev => {
       document.getElementById("bpm").value = bpm;
       document.getElementById("bpmVal").textContent = bpm;
     }
-    setEventos(res.eventos);
+    setEventos(res.eventos, res.compases);
     mensaje("");
   } catch (err) {
     mensaje("Error al leer el archivo: " + err.message);
@@ -529,7 +654,7 @@ document.getElementById("fileXml").addEventListener("change", async ev => {
 });
 
 // ============================================================
-// 10. ESCANEO CON IA (requiere el Worker)
+// 11. ESCANEO CON IA (requiere el Worker)
 // ============================================================
 const PROXY_URL = ""; // p. ej. "https://partituras.TU-SUBDOMINIO.workers.dev/analizar"
 const btnScan = document.getElementById("btnScan");
@@ -572,7 +697,7 @@ document.getElementById("fileImg").addEventListener("change", async ev => {
 });
 
 // ============================================================
-// 11. INICIO
+// 12. INICIO
 // ============================================================
 setEventos(melodiaEjemplo());
 window.addEventListener("resize", () => pintar(beatActual()));
