@@ -38,7 +38,7 @@ input[type=file]{color:var(--mut);max-width:100%}
 #btnStop{min-width:110px}
 .tempo{display:flex;flex-direction:column;gap:6px;width:100%;margin-top:12px}
 .tempo label{white-space:nowrap}
-.tempo input[type=range]{width:100%}  
+.tempo input[type=range]{width:100%}
 </style>
 </head>
 <body>
@@ -96,14 +96,30 @@ for (let i = 0; i < 25; i++) {
 }
 const MIDI_BASE = 72;
 
+// Convierte nombres escritos (Reb, Mi#, Fa# agudo, Do sobre agudo...) a la nota de ORDEN
+const LETRA = { Do: 0, Re: 2, Mi: 4, Fa: 5, Sol: 7, La: 9, Si: 11 };
+const ALTER = { "": 0, "#": 1, "##": 2, "b": -1, "bb": -2 };
+
+function nombreAOrden(txt) {
+  const t = String(txt).trim().replace(/♭/g, "b").replace(/♯/g, "#");
+  const m = t.match(/^(do|re|mi|fa|sol|la|si)(##|bb|#|b)?(?:\s+(agudo|sobre agudo))?$/i);
+  if (!m) return null;
+  const letra = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
+  const sufijo = (m[3] || "").toLowerCase();
+  const oct = sufijo === "agudo" ? 6 : sufijo === "sobre agudo" ? 7 : 5;
+  const midi = (oct + 1) * 12 + LETRA[letra] + ALTER[(m[2] || "").toLowerCase()];
+  const i = midi - MIDI_BASE;
+  return i >= 0 && i <= 24 ? ORDEN[i] : null;
+}
+
 // ============================================================
 // 2. TABLA DE DIGITACIONES
 // holes = [dedo1, dedo2, dedo3, dedo4, dedo5, dedo6, dedo7, pulgar]
 // 1 = tapado · 0 = abierto · 0.5 = medio agujero
-// verificada: true solo cuando la columna se ha comprobado contra la plantilla y la flauta.
 // ============================================================
 const TABLA_PLANTILLA = {};
 ORDEN.forEach(n => TABLA_PLANTILLA[n] = { holes: [0,0,0,0,0,0,0,0], verificada: false });
+
 const DIGITACIONES_PLANTILLA = {
   "Do#":            [1,1,1,1,1,1,0.5,1],
   "Re":             [1,1,1,1,1,1,0,1],
@@ -131,7 +147,6 @@ const DIGITACIONES_PLANTILLA = {
   "Do sobre agudo": [1,0,0,1,0,0,0,0.5]
 };
 
-// Cargar en la tabla. Todas verificadas tras comprobarlas con la flauta.
 Object.entries(DIGITACIONES_PLANTILLA).forEach(([nombre, holes]) => {
   TABLA_PLANTILLA[nombre] = { holes, verificada: true };
 });
@@ -203,7 +218,7 @@ function melodiaEjemplo() {
 }
 
 // ============================================================
-// 5. LECTOR MUSICXML (primera parte, notas y silencios)
+// 5. LECTOR MUSICXML (notas y silencios; se ignoran acordes y adornos)
 // ============================================================
 function parseMusicXML(texto) {
   const doc = new DOMParser().parseFromString(texto, "application/xml");
@@ -471,7 +486,7 @@ document.getElementById("fileXml").addEventListener("change", async ev => {
 });
 
 // ============================================================
-// 9. ESCANEO CON IA (Fase 3, requiere el Worker)
+// 9. ESCANEO CON IA (requiere el Worker)
 // ============================================================
 const PROXY_URL = ""; // p. ej. "https://partituras.TU-SUBDOMINIO.workers.dev/analizar"
 const btnScan = document.getElementById("btnScan");
@@ -494,14 +509,21 @@ document.getElementById("fileImg").addEventListener("change", async ev => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imagen: base64, mime: f.type })
     });
-    const { notas } = await resp.json();   // esperado: ["Do","Re",...] en nombres de ORDEN
-    const validas = notas.filter(n => ORDEN.includes(n) || n === null);
-    if (validas.length !== notas.length) mensaje("Algunas notas no se reconocen; revísalas.");
-    let t = 0;
+    const { notas } = await resp.json();   // esperado: nombres como "Do", "Re#", "Reb", "Fa# agudo", o null
+
+    // Normalizar primero: "Reb" -> "Do#", "Mi#" -> "Fa", etc.
+    const normalizadas = notas.map(n => n === null ? null : (nombreAOrden(n) ?? n));
+    const noReconocidas = normalizadas.filter(n => n !== null && !ORDEN.includes(n));
+
     parar();
-    setEventos(notas.map(n => { const e = crearEvento(n, t, 1); t++; return e; }));
-    if (!validas.length || validas.length !== notas.length) return;
-    mensaje("Revisa la secuencia: la IA puede equivocarse. Lo fiable es MusicXML.");
+    let t = 0;
+    setEventos(normalizadas.map(n => { const e = crearEvento(n, t, 1); t++; return e; }));
+
+    if (noReconocidas.length) {
+      mensaje(`Notas no reconocidas: ${noReconocidas.join(", ")}. Revísalas.`);
+    } else {
+      mensaje("Revisa la secuencia: la IA puede equivocarse. Lo fiable es MusicXML.");
+    }
   } catch (err) {
     mensaje("Error al analizar la imagen: " + err.message);
   }
