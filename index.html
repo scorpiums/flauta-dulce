@@ -86,7 +86,7 @@ input[type=file]{color:var(--mut);max-width:100%}
 
 <script>
 // ============================================================
-// 1. NOMBRES Y RANGO (Do grave de la plantilla = MIDI 60)
+// 1. NOMBRES Y RANGO (Do grave de la plantilla = C4 = MIDI 60)
 // ============================================================
 const NOMBRES = ["Do","Do#","Re","Re#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Si"];
 const ORDEN = [];
@@ -94,7 +94,7 @@ for (let i = 0; i < 25; i++) {
   const base = NOMBRES[i % 12];
   ORDEN.push(i === 24 ? "Do sobre agudo" : (i < 12 ? base : base + " agudo"));
 }
-cconst MIDI_BASE = 60; // Do grave de la plantilla = C4 (Do central)
+const MIDI_BASE = 60;
 
 // Convierte nombres escritos (Reb, Mi#, Fa# agudo, Do sobre agudo...) a la nota de ORDEN
 const LETRA = { Do: 0, Re: 2, Mi: 4, Fa: 5, Sol: 7, La: 9, Si: 11 };
