@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Flauta Dulce · Digitación y Reproductor</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#f8fafc;--mut:#94a3b8;--acc:#38bdf8;--play:#ef4444;--ok:#22c55e;--warn:#f59e0b}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);margin:0;padding:16px;display:flex;flex-direction:column;align-items:center;min-height:100vh}
+h1{margin:4px 0;color:var(--acc);font-size:1.5rem;text-align:center}
+.sub{color:var(--mut);margin:0 0 18px;text-align:center;font-size:.9rem}
+.panel{background:var(--card);border-radius:12px;padding:14px 18px;width:100%;max-width:900px;margin-bottom:14px;box-shadow:0 10px 25px -5px rgba(0,0,0,.3)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+button{background:var(--acc);color:#0f172a;font-weight:700;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:.95rem}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.sec{background:#334155;color:var(--txt)}
+input[type=range]{accent-color:var(--acc);flex:1;min-width:160px}
+input[type=file]{color:var(--mut);max-width:100%}
+.stage{position:relative;width:100%;max-width:900px;height:250px;background:#020617;border:2px solid var(--line);border-radius:16px;overflow:hidden}
+.playhead{position:absolute;top:0;bottom:0;left:30%;width:3px;background:var(--play);box-shadow:0 0 10px var(--play);z-index:5}
+.track{position:absolute;top:14px;left:0;display:flex;gap:14px;will-change:transform}
+.card{flex:0 0 auto;width:96px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;align-items:center;transition:border-color .15s,transform .15s}
+.card.active{border-color:var(--acc);transform:scale(1.06);box-shadow:0 0 14px rgba(56,189,248,.35)}
+.card.rest{opacity:.5}
+.card.pend{border-style:dashed}
+.nm{font-weight:700;font-size:1rem;margin-bottom:4px;white-space:nowrap}
+.tag{font-size:.65rem;margin-top:4px;color:var(--mut);text-align:center}
+.tag.ok{color:var(--ok)}
+.tag.warn{color:var(--warn)}
+.flute{width:60px;height:150px}
+.big{display:flex;gap:20px;align-items:center;justify-content:center;flex-wrap:wrap}
+.big .flute{width:110px;height:230px}
+.info{color:var(--mut);font-size:.85rem;line-height:1.4}
+.count{font-size:2rem;font-weight:800;color:var(--play);min-width:48px;text-align:center}
+#msg{color:var(--warn);font-size:.85rem;min-height:1.2em;text-align:center}
+</style>
+</head>
+<body>
+
+<h1>🎼 Flauta Dulce · Digitación y Reproductor</h1>
+<p class="sub">Digitación SVG generada desde una tabla · reproducción programada en el reloj de Web Audio</p>
+
+<div class="panel">
+  <div class="row">
+    <button id="btnPlay">▶ Reproducir</button>
+    <button id="btnStop" class="sec">■ Parar</button>
+    <label class="info">Tempo: <b id="bpmVal">80</b> BPM</label>
+    <input type="range" id="bpm" min="40" max="160" value="80">
+    <label class="info"><input type="checkbox" id="countIn" checked> Cuenta atrás</label>
+  </div>
+</div>
+
+<div class="stage"><div class="playhead"></div><div id="track" class="track"></div></div>
+<div id="msg"></div>
+
+<div class="panel" style="margin-top:14px">
+  <div class="row">
+    <input type="file" id="fileXml" accept=".musicxml,.xml">
+    <button class="sec" id="btnEjemplo">Melodía de ejemplo</button>
+    <button class="sec" id="btnScan" disabled title="Requiere configurar el Worker">Escanear foto (IA)</button>
+    <input type="file" id="fileImg" accept="image/*" hidden>
+  </div>
+  <p class="info" id="infoPartitura"></p>
+</div>
+
+<div class="panel">
+  <div class="big">
+    <div class="count" id="contador"></div>
+    <div id="actual"></div>
+  </div>
+  <p class="info" id="infoNota" style="text-align:center"></p>
+</div>
+
+<div class="panel info">
+  <b>Estado de la plantilla:</b> <span id="estadoTabla"></span>
+  <br>Las digitaciones marcadas como pendientes no están verificadas contra tu plantilla. Completa la tabla <code>TABLA_PLANTILLA</code> antes de usarla con alumnos.
+</div>
+
+<script>
+// ============================================================
+// 1. NOMBRES Y RANGO (Do grave de la plantilla = MIDI 72)
+// ============================================================
+const NOMBRES = ["Do","Do#","Re","Re#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Si"];
+const ORDEN = [];
+for (let i = 0; i < 25; i++) {
+  const base = NOMBRES[i % 12];
+  ORDEN.push(i === 24 ? "Do sobre agudo" : (i < 12 ? base : base + " agudo"));
+}
+const MIDI_BASE = 72;
+
+// ============================================================
+// 2. TABLA DE DIGITACIONES
+// holes = [dedo1, dedo2, dedo3, dedo4, dedo5, dedo6, dedo7, pulgar]
+// 1 = tapado · 0 = abierto · 0.5 = medio agujero
+// verificada: true solo cuando la columna se ha comprobado contra la plantilla y la flauta.
+// ============================================================
+const TABLA_PLANTILLA = {};
+ORDEN.forEach(n => TABLA_PLANTILLA[n] = { holes: [0,0,0,0,0,0,0,0], verificada: false });
+TABLA_PLANTILLA["Do"] = { holes: [1,1,1,1,1,1,1,1], verificada: true }; // confirmar con la flauta
+
+// ============================================================
+// 3. SVG DE LA FLAUTA
+// ============================================================
+let svgUid = 0;
+function svgFlauta(holes) {
+  const uid = "f" + (++svgUid);
+  const ys = [30, 50, 70, 90, 110, 130, 150]; // dedos 1..7 de arriba abajo
+  const cx = 45, r = 8;
+  let s = `<rect x="36" y="8" width="18" height="170" rx="9" fill="#1e293b" stroke="#64748b" stroke-width="2"/>`;
+
+  const agujero = (x, y, st, key) => {
+    const id = `${uid}-${key}`;
+    if (st === 0.5) {
+      return `<clipPath id="${id}"><rect x="${x - r}" y="${y}" width="${2 * r}" height="${r}"/></clipPath>
+        <circle cx="${x}" cy="${y}" r="${r}" fill="#0f172a" stroke="#64748b" stroke-width="1.5"/>
+        <circle cx="${x}" cy="${y}" r="${r}" fill="#f1f5f9" clip-path="url(#${id})"/>`;
+    }
+    const fill = st === 1 ? "#f1f5f9" : "#0f172a";
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="#64748b" stroke-width="1.5"/>`;
+  };
+
+  for (let k = 0; k < 7; k++) s += agujero(cx, ys[k], holes[k], "d" + k);
+  s += agujero(62, ys[1], holes[7], "pulgar"); // pulgar lateral, a la altura del dedo 2
+  return `<svg class="flute" viewBox="0 0 90 190">${s}</svg>`;
+}
+
+// ============================================================
+// 4. MODELO DE EVENTOS
+// ============================================================
+let eventos = [];
+let totalBeats = 0;
+let bpm = 80;
+
+function freqDeMidi(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+function crearEvento(nombre, start, dur) {
+  if (nombre === null) return { rest: true, nombre: "Silencio", start, dur };
+  const i = ORDEN.indexOf(nombre);
+  return { rest: false, nombre, midi: i >= 0 ? MIDI_BASE + i : null, freq: i >= 0 ? freqDeMidi(MIDI_BASE + i) : null, start, dur };
+}
+
+function crearEventoMidi(midi, start, dur) {
+  const i = midi - MIDI_BASE;
+  const fuera = i < 0 || i > 24;
+  return {
+    rest: false,
+    nombre: fuera ? `fuera de rango (MIDI ${midi})` : ORDEN[i],
+    midi, freq: freqDeMidi(midi), start, dur, fuera
+  };
+}
+
+function setEventos(lista) {
+  eventos = lista;
+  totalBeats = lista.length ? Math.max(...lista.map(e => e.start + e.dur)) : 0;
+  renderTrack();
+  actualizarInfo();
+  pintar(0);
+}
+
+function melodiaEjemplo() {
+  const pasos = [["Do",1],["Re",1],["Mi",1],["Fa",1],["Sol",2],["Sol",1],["Do agudo",2],["Sol",2],[null,1],["Do",2]];
+  let t = 0;
+  return pasos.map(([n, d]) => { const e = crearEvento(n, t, d); t += d; return e; });
+}
+
+// ============================================================
+// 5. LECTOR MUSICXML (primera parte, notas y silencios)
+// ============================================================
+function parseMusicXML(texto) {
+  const doc = new DOMParser().parseFromString(texto, "application/xml");
+  if (doc.querySelector("parsererror")) throw new Error("el archivo no es un XML válido");
+  const part = doc.querySelector("part");
+  if (!part) throw new Error("no se encontró ninguna parte musical");
+
+  const tempoEl = doc.querySelector("sound[tempo]");
+  const tempo = tempoEl ? Math.round(parseFloat(tempoEl.getAttribute("tempo"))) : null;
+
+  const PASOS = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const numTag = (el, tag) => { const t = el.querySelector(tag); return t ? parseFloat(t.textContent) : 0; };
+
+  let div = 1, cursor = 0;
+  const lista = [];
+
+  for (const m of part.children) {
+    if (m.tagName !== "measure") continue;
+    for (const el of m.children) {
+      if (el.tagName === "attributes") {
+        const d = el.querySelector("divisions");
+        if (d) div = parseFloat(d.textContent);
+      } else if (el.tagName === "backup") {
+        cursor -= numTag(el, "duration") / div;
+      } else if (el.tagName === "forward") {
+        cursor += numTag(el, "duration") / div;
+      } else if (el.tagName === "note") {
+        if (el.querySelector("chord") || el.querySelector("grace")) continue;
+        const dur = numTag(el, "duration") / div;
+
+        if (el.querySelector("rest")) {
+          lista.push(crearEvento(null, cursor, dur));
+        } else {
+          const p = el.querySelector("pitch");
+          const step = p.querySelector("step").textContent;
+          const alter = Math.round(numTag(p, "alter"));
+          const oct = parseInt(p.querySelector("octave").textContent, 10);
+          const midi = (oct + 1) * 12 + PASOS[step] + alter;
+
+          const ultimo = lista[lista.length - 1];
+          const ligadura = el.querySelector('tie[type="stop"]');
+          if (ligadura && ultimo && !ultimo.rest && ultimo.midi === midi &&
+              Math.abs(ultimo.start + ultimo.dur - cursor) < 1e-6) {
+            ultimo.dur += dur;
+          } else {
+            lista.push(crearEventoMidi(midi, cursor, dur));
+          }
+        }
+        cursor += dur;
+      }
+    }
+  }
+  return { eventos: lista, tempo };
+}
+
+// ============================================================
+// 6. AUDIO: TODO SE PROGRAMA EN EL RELOJ DE AUDIO
+// ============================================================
+let ac = null, reproduciendo = false, offset = 0, beatZero = 0, nodos = [], rafId = 0, lastIdx = -2;
+const spb = () => 60 / bpm;
+
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (ac.state === "suspended") ac.resume();
+  return ac;
+}
+
+function tono(freq, t, dur, vol = 0.25) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = "sine";
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.04);
+  g.gain.setValueAtTime(vol, Math.max(t + 0.04, t + dur - 0.06));
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  o.connect(g).connect(ac.destination);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+  nodos.push(o);
+}
+
+function clic(t, acento) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.value = acento ? 1500 : 1000;
+  g.gain.setValueAtTime(0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+  o.connect(g).connect(ac.destination);
+  o.start(t);
+  o.stop(t + 0.06);
+  nodos.push(o);
+}
+
+function pararNodos() {
+  nodos.forEach(n => { try { n.stop(); } catch (e) {} });
+  nodos = [];
+}
+
+// Beat actual según el reloj de audio (no según setInterval ni rAF)
+function beatActual() {
+  if (!reproduciendo) return offset;
+  return (ac.currentTime - beatZero) / spb();
+}
+
+function play() {
+  if (!eventos.length) { mensaje("Carga una melodía primero."); return; }
+  getAC();
+  pararNodos();
+
+  const ahora = ac.currentTime + 0.1;
+  const cuenta = offset === 0 && document.getElementById("countIn").checked;
+  // Momento en que empieza el beat 0 de la partitura
+  beatZero = cuenta ? ahora + 4 * spb() : ahora - offset * spb();
+
+  if (cuenta) for (let k = 0; k < 4; k++) clic(ahora + k * spb(), k === 0);
+
+  for (const e of eventos) {
+    if (e.rest || !e.freq) continue;
+    const fin = e.start + e.dur;
+    if (fin <= offset) continue;
+    const inicio = Math.max(e.start, offset);
+    const t = beatZero + inicio * spb();
+    const dur = (fin - inicio) * spb() * 0.92;
+    tono(e.freq, t, dur);
+  }
+
+  reproduciendo = true;
+  document.getElementById("btnPlay").textContent = "⏸ Pausar";
+  cancelAnimationFrame(rafId);
+  bucle();
+}
+
+function pausar() {
+  if (!reproduciendo) return;
+  offset = Math.max(0, Math.min(beatActual(), totalBeats));
+  reproduciendo = false;
+  pararNodos();
+  cancelAnimationFrame(rafId);
+  document.getElementById("btnPlay").textContent = "▶ Reproducir";
+  pintar(offset);
+}
+
+function parar() {
+  reproduciendo = false;
+  offset = 0;
+  pararNodos();
+  cancelAnimationFrame(rafId);
+  document.getElementById("btnPlay").textContent = "▶ Reproducir";
+  pintar(0);
+}
+
+function bucle() {
+  const b = beatActual();
+  if (b >= totalBeats) { parar(); return; }
+  pintar(b);
+  rafId = requestAnimationFrame(bucle);
+}
+
+// ============================================================
+// 7. RENDER
+// ============================================================
+const CARD_W = 96, GAP = 14, STEP = CARD_W + GAP;
+
+function renderTrack() {
+  const pista = document.getElementById("track");
+  pista.innerHTML = "";
+  eventos.forEach(e => {
+    const div = document.createElement("div");
+    const t = TABLA_PLANTILLA[e.nombre];
+    let estado, clase = "", ok = false;
+    if (e.rest) estado = "silencio";
+    else if (!t) { estado = "fuera de plantilla"; clase = " pend"; }
+    else if (!t.verificada) { estado = "pendiente"; clase = " pend"; }
+    else { estado = "verificada"; ok = true; }
+
+    div.className = "card" + (e.rest ? " rest" : "") + clase;
+    const cuerpo = e.rest ? '<div style="height:150px;display:flex;align-items:center">—</div>'
+                          : svgFlauta(t ? t.holes : [0,0,0,0,0,0,0,0]);
+    div.innerHTML = `<div class="nm">${e.nombre}</div>${cuerpo}<div class="tag ${ok ? "ok" : "warn"}">${e.dur} t · ${estado}</div>`;
+    pista.appendChild(div);
+  });
+}
+
+function pintar(b) {
+  const beat = Math.max(b, 0);
+  let idx = 0, frac = 0, enNota = -1;
+  const i = eventos.findIndex(e => beat >= e.start && beat < e.start + e.dur);
+  if (i >= 0) { idx = i; enNota = i; frac = (beat - eventos[i].start) / eventos[i].dur; }
+  else if (eventos.length && beat >= totalBeats) { idx = eventos.length - 1; frac = 1; }
+
+  const stage = document.querySelector(".stage");
+  const px = stage.clientWidth * 0.3;
+  const pos = (idx + frac) * STEP;
+  document.getElementById("track").style.transform = `translateX(${px - pos - CARD_W / 2}px)`;
+
+  document.querySelectorAll(".card").forEach((c, k) => c.classList.toggle("active", k === enNota));
+
+  const contador = document.getElementById("contador");
+  contador.textContent = (reproduciendo && b < 0) ? Math.floor(b) + 5 : "";
+
+  if (idx !== lastIdx) { lastIdx = idx; renderActual(idx); }
+}
+
+function renderActual(i) {
+  const act = document.getElementById("actual");
+  const info = document.getElementById("infoNota");
+  const e = eventos[i];
+  if (!e) { act.innerHTML = ""; info.textContent = ""; return; }
+  if (e.rest) { act.innerHTML = '<div class="info">Silencio</div>'; info.textContent = ""; return; }
+  const t = TABLA_PLANTILLA[e.nombre];
+  act.innerHTML = svgFlauta(t ? t.holes : [0,0,0,0,0,0,0,0]);
+  info.textContent = e.nombre + (t && !t.verificada ? " · digitación pendiente de verificar" : "");
+}
+
+function actualizarInfo() {
+  const pend = eventos.filter(e => !e.rest && (!TABLA_PLANTILLA[e.nombre] || !TABLA_PLANTILLA[e.nombre].verificada)).length;
+  const fuera = eventos.filter(e => e.fuera).length;
+  document.getElementById("infoPartitura").textContent =
+    `${eventos.length} eventos · ${totalBeats} tiempos · ${bpm} BPM` +
+    (pend ? ` · ${pend} notas con digitación pendiente` : "") +
+    (fuera ? ` · ${fuera} notas fuera de rango` : "");
+
+  const verificadas = ORDEN.filter(n => TABLA_PLANTILLA[n].verificada).length;
+  document.getElementById("estadoTabla").textContent = `${verificadas} de ${ORDEN.length} digitaciones verificadas`;
+}
+
+function mensaje(t) { document.getElementById("msg").textContent = t; }
+
+// ============================================================
+// 8. CONTROLES
+// ============================================================
+document.getElementById("btnPlay").addEventListener("click", () => reproduciendo ? pausar() : play());
+document.getElementById("btnStop").addEventListener("click", parar);
+
+document.getElementById("bpm").addEventListener("input", ev => {
+  const estaba = reproduciendo;
+  if (estaba) pausar();           // guarda la posición con el tempo anterior
+  bpm = parseInt(ev.target.value, 10);
+  document.getElementById("bpmVal").textContent = bpm;
+  actualizarInfo();
+  if (estaba) play();
+});
+
+document.getElementById("btnEjemplo").addEventListener("click", () => {
+  parar();
+  setEventos(melodiaEjemplo());
+  mensaje("");
+});
+
+document.getElementById("fileXml").addEventListener("change", async ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  try {
+    const res = parseMusicXML(await f.text());
+    parar();
+    if (res.tempo) {
+      bpm = Math.min(160, Math.max(40, res.tempo));
+      document.getElementById("bpm").value = bpm;
+      document.getElementById("bpmVal").textContent = bpm;
+    }
+    setEventos(res.eventos);
+    mensaje("");
+  } catch (err) {
+    mensaje("Error al leer el archivo: " + err.message);
+  }
+});
+
+// ============================================================
+// 9. ESCANEO CON IA (Fase 3, requiere el Worker)
+// ============================================================
+const PROXY_URL = ""; // p. ej. "https://partituras.TU-SUBDOMINIO.workers.dev/analizar"
+const btnScan = document.getElementById("btnScan");
+btnScan.disabled = !PROXY_URL;
+btnScan.addEventListener("click", () => document.getElementById("fileImg").click());
+
+document.getElementById("fileImg").addEventListener("change", async ev => {
+  const f = ev.target.files[0];
+  if (!f || !PROXY_URL) return;
+  mensaje("Analizando la imagen…");
+  try {
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(",")[1]);
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+    const resp = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagen: base64, mime: f.type })
+    });
+    const { notas } = await resp.json();   // esperado: ["Do","Re",...] en nombres de ORDEN
+    const validas = notas.filter(n => ORDEN.includes(n) || n === null);
+    if (validas.length !== notas.length) mensaje("Algunas notas no se reconocen; revísalas.");
+    let t = 0;
+    parar();
+    setEventos(notas.map(n => { const e = crearEvento(n, t, 1); t++; return e; }));
+    if (!validas.length || validas.length !== notas.length) return;
+    mensaje("Revisa la secuencia: la IA puede equivocarse. Lo fiable es MusicXML.");
+  } catch (err) {
+    mensaje("Error al analizar la imagen: " + err.message);
+  }
+});
+
+// ============================================================
+// 10. INICIO
+// ============================================================
+setEventos(melodiaEjemplo());
+window.addEventListener("resize", () => pintar(beatActual()));
+</script>
+</body>
+</html>
